@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual envs
+venv/
+.env/
+.env*/
+.venv/
+
+# VS Code remote server
+.vscode-server/
+
+# VS Code local settings (if any)
+.vscode/
+
+# User shell / home config (não versionar)
+.bash_history
+.bash_logout
+.bashrc
+.lesshst
+.profile
+.ssh/
+.sudo_as_admin_successful
+.viminfo
+.wget-hsts
+
+# Caches e temporários
+.cache/
+**/.DS_Store
+*.log
+
+# dotnet / SDK local
+.dotnet/
+
+# Snap e outros diretórios do sistema
+snap/
+
+# Outros ficheiros temporários
+*.swp
+*.swo

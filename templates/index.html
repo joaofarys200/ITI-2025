@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Sharing Service</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+
+        h2 {
+            color: #bb86fc;
+        }
+
+        form {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Custom File Input */
+        .file-upload-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 15px;
+        }
+
+        .file-upload {
+            opacity: 0;
+            width: 100%;
+            height: 40px;
+            position: absolute;
+            cursor: pointer;
+        }
+
+        .file-upload-label {
+            background-color: #333;
+            color: #e0e0e0;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: center;
+            display: block;
+            width: 100%;
+            transition: 0.3s;
+        }
+
+        .file-upload-label:hover {
+            background-color: #444;
+        }
+
+        .selected-file {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #03dac6;
+        }
+
+        button {
+            background-color: #bb86fc;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #9a67ea;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background: #292929;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.3s;
+        }
+
+        li:hover {
+            background: #373737;
+        }
+
+        a {
+            text-decoration: none;
+            color: #03dac6;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        a:hover {
+            color: #18ffff;
+        }
+
+        .delete-form {
+            display: inline;
+        }
+
+        .delete-btn {
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Upload a File</h2>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <div class="file-upload-wrapper">
+                <input type="file" name="file" class="file-upload" id="fileInput" required>
+                <label for="fileInput" class="file-upload-label">Choose a File</label>
+            </div>
+            <p class="selected-file" id="fileName">No file selected</p>
+            <button type="submit">Upload</button>
+        </form>
+
+        <h2>Download & Delete Files</h2>
+        <ul>
+            {% for file in files %}
+                <li>
+                    <a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a>
+                    <form class="delete-form" action="{{ url_for('delete_file', filename=file) }}" method="post">
+                        <button class="delete-btn" type="submit">Delete</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const fileName = event.target.files.length ? event.target.files[0].name : 'No file selected';
+            document.getElementById('fileName').textContent = fileName;
+        });
+    </script>
+</body>
+</html>
