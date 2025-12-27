@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, send_file,render_template,url_for,redirect, Response, abort
+from flask import Flask, request, jsonify, send_file,render_template,url_for,redirect, Response, abort, g
 import os
 import shutil
 import socket
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+import time
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 #observacoes feitas,apenas funciona por causa do html,sem ele nao consigo redirecionar os url,logo tenho que testar no postman a api.
 app = Flask(__name__)
@@ -13,6 +14,9 @@ app.config["BASE_DIR"] = BASE_DIR
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 #coisas para o prometheus
 REQUEST_COUNT = Counter("app_requests_total", "Total de pedidos HTTP", ["endpoint", "hostname"])
+REQUEST_LATENCY = Histogram("app_request_duration_seconds", "Latencia de pedidos em segundos", ["endpoint"])
+REQUEST_STATUS = Counter("app_requests_status_total", "Total de pedidos HTTP por status", ["endpoint", "status"])
+IN_PROGRESS = Gauge("app_inprogress_requests", "Pedidos em progresso", ["hostname"])
 
 FORBIDDEN_EXTENSIONS = {
     ".exe",
@@ -41,7 +45,25 @@ def _safe_name(name: str) -> str | None:
 
 @app.before_request
 def before_request():
-    REQUEST_COUNT.labels(request.path, socket.gethostname()).inc()
+    g.start_time = time.time()
+    hostname = socket.gethostname()
+    REQUEST_COUNT.labels(request.path, hostname).inc()
+    IN_PROGRESS.labels(hostname).inc()
+
+
+@app.after_request
+def after_request(response):
+    hostname = socket.gethostname()
+    duration = time.time() - getattr(g, "start_time", time.time())
+    REQUEST_LATENCY.labels(request.path).observe(duration)
+    REQUEST_STATUS.labels(request.path, str(response.status_code)).inc()
+    return response
+
+
+@app.teardown_request
+def teardown_request(exc):
+    hostname = socket.gethostname()
+    IN_PROGRESS.labels(hostname).dec()
 
 
 @app.route("/")
