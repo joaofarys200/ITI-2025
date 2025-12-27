@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, send_file,render_template,url_for,redirect, Response
+from flask import Flask, request, jsonify, send_file,render_template,url_for,redirect, Response, abort
 import os
+import shutil
 import socket
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
@@ -9,8 +10,34 @@ app = Flask(__name__)
 # Dentro do container, a pasta partilhada é montada em /app/storage (ver docker-compose.yml)
 BASE_DIR = "/app/storage"
 app.config["BASE_DIR"] = BASE_DIR
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 #coisas para o prometheus
 REQUEST_COUNT = Counter("app_requests_total", "Total de pedidos HTTP", ["endpoint", "hostname"])
+
+FORBIDDEN_EXTENSIONS = {
+    ".exe",
+    ".bat",
+    ".cmd",
+    ".sh",
+    ".ps1",
+    ".php",
+    ".js",
+    ".jar",
+    ".dll",
+    ".so",
+    ".py",
+}
+
+
+def _safe_name(name: str) -> str | None:
+    if not name:
+        return None
+    if "/" in name or "\\" in name:
+        return None
+    normalized = os.path.normpath(name)
+    if normalized.startswith(".."):
+        return None
+    return normalized
 
 @app.before_request
 def before_request():
@@ -31,19 +58,59 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         return "No selected file", 400
-    file_path = os.path.join(app.config["BASE_DIR"], file.filename)
+    safe_name = _safe_name(file.filename)
+    if not safe_name:
+        return "Invalid filename", 400
+    _, ext = os.path.splitext(safe_name)
+    if ext.lower() in FORBIDDEN_EXTENSIONS:
+        return "Executable or script files are not allowed", 400
+    file_path = os.path.join(app.config["BASE_DIR"], safe_name)
     file.save(file_path)
     return redirect(url_for('home'))
 
 @app.route("/download/<filename>", methods=["GET"])
 def download_file(filename):
-    return send_file(os.path.join(app.config["BASE_DIR"], filename))
+    safe_name = _safe_name(filename)
+    if not safe_name:
+        abort(400)
+    file_path = os.path.join(app.config["BASE_DIR"], safe_name)
+    if not os.path.exists(file_path):
+        abort(404)
+    return send_file(file_path)
 
 @app.route('/delete/<filename>', methods=['POST'])
 def delete_file(filename):
-    file_path = os.path.join(app.config['BASE_DIR'], filename)
+    safe_name = _safe_name(filename)
+    if not safe_name:
+        abort(400)
+    file_path = os.path.join(app.config['BASE_DIR'], safe_name)
     if os.path.exists(file_path):
-        os.remove(file_path)
+        if os.path.isdir(file_path):
+            shutil.rmtree(file_path)
+        else:
+            os.remove(file_path)
+    return redirect(url_for('home'))
+
+
+@app.route('/update/<filename>', methods=['POST'])
+def update_file(filename):
+    safe_old = _safe_name(filename)
+    if not safe_old:
+        abort(400)
+    new_name = request.form.get('new_name')
+    if not new_name:
+        return "No new name provided", 400
+    safe_new = _safe_name(new_name)
+    if not safe_new:
+        return "Invalid new name", 400
+
+    old_path = os.path.join(app.config["BASE_DIR"], safe_old)
+    new_path = os.path.join(app.config["BASE_DIR"], safe_new)
+
+    if not os.path.exists(old_path):
+        return "Original file not found", 404
+
+    os.rename(old_path, new_path)
     return redirect(url_for('home'))
 
 
@@ -55,6 +122,6 @@ def metrics():
     return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=False)
 
 #add to git
